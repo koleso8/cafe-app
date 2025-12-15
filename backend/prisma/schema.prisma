@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CafePlan {
+  TRIAL
+  BASIC
+  PRO
+  PREMIUM
+  ENTERPRISE
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+  CLIENT
+}
+
+model Cafe {
+  id         String  @id @default(cuid())
+  name       String
+  slug       String? @unique
+  startParam String  @unique
+
+  botId       String?
+  botUsername String? @unique
+  botToken    String?
+
+  address     String?
+  phone       String?
+  locationLat Float?
+  locationLng Float?
+  timezone    String  @default("Europe/Kiev")
+
+  plan          CafePlan  @default(TRIAL)
+  planExpiresAt DateTime?
+  isActive      Boolean   @default(true)
+
+  settings CafeSettings?
+  menus    Menu[]
+  users    CafeUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CafeSettings {
+  id     String @id @default(cuid())
+  cafe   Cafe   @relation(fields: [cafeId], references: [id])
+  cafeId String @unique
+
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  themeMode      String? @default("LIGHT")
+
+  logoUrl            String?
+  backgroundImageUrl String?
+  layoutConfig       Json?
+
+  showPopularSection   Boolean @default(true)
+  showCategoriesAsTabs Boolean @default(true)
+
+  language String? @default("ua")
+  currency String? @default("UAH")
+
+  tipsEnabled    Boolean  @default(false)
+  tipsPresets    Json?
+  minOrderAmount Decimal?
+
+  paymentMethods      Json?
+  bookingEnabled      Boolean @default(false)
+  deliveryZonesConfig Json?
+  workingHoursConfig  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id         String  @id @default(cuid())
+  telegramId BigInt? @unique
+  name       String?
+  phone      String?
+  email      String?
+
+  cafes CafeUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CafeUser {
+  id     String   @id @default(cuid())
+  cafe   Cafe     @relation(fields: [cafeId], references: [id])
+  cafeId String
+  user   User     @relation(fields: [userId], references: [id])
+  userId String
+  role   UserRole
+
+  createdAt DateTime @default(now())
+
+  @@unique([cafeId, userId])
+}
+
+model Menu {
+  id       String  @id @default(cuid())
+  cafe     Cafe    @relation(fields: [cafeId], references: [id])
+  cafeId   String
+  name     String
+  isActive Boolean @default(true)
+
+  items MenuItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MenuItem {
+  id          String  @id @default(cuid())
+  menu        Menu    @relation(fields: [menuId], references: [id])
+  menuId      String
+  name        String
+  description String?
+  price       Decimal
+  category    String?
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
