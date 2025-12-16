@@ -1,5 +1,7 @@
-import express, { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import { validateTelegramInitData } from "../utils/validateTelegram";
+import { prisma } from "../prisma";
+import { decryptToken } from "../utils/crypto";
 
 // Расширяем типы Express для добавления telegramUser
 declare global {
@@ -16,41 +18,97 @@ declare global {
   }
 }
 
-export function telegramAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
-  const initData = req.headers["x-telegram-init-data"];
+interface TelegramAuthOptions {
+  /**
+   * Если true — не использовать токен конкретного кафе, только главный бот.
+   */
+  forceMainBot?: boolean;
+  /**
+   * Если true — при отсутствии initData вернём 401.
+   */
+  required?: boolean;
+}
 
-  // Если заголовок отсутствует — не требуем авторизацию, продолжаем как аноним
-  if (!initData || typeof initData !== "string") {
-    return next();
-  }
+async function resolveCafeBotToken(req: Request): Promise<string | null> {
+  const { startParam, cafeSlug } = (req.body || {}) as {
+    startParam?: string | null;
+    cafeSlug?: string | null;
+  };
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  
-  if (!botToken) {
-    res.status(500).json({ error: "Bot token not configured" });
-    return;
-  }
+  if (!startParam && !cafeSlug) return null;
 
-  const data = validateTelegramInitData(initData, botToken);
+  const cafe = await prisma.cafe.findFirst({
+    where: {
+      OR: [
+        startParam ? { startParam } : undefined,
+        cafeSlug ? { slug: cafeSlug } : undefined,
+      ].filter(Boolean) as any,
+    },
+  });
 
-  if (!data) {
-    res.status(401).json({ error: "Invalid Telegram initData" });
-    return;
-  }
+  if (!cafe?.botToken) return null;
 
-  // user приходит строкой JSON
-  if (data.user) {
-    try {
-      req.telegramUser = JSON.parse(data.user);
-    } catch {
-      res.status(400).json({ error: "Invalid user data" });
+  return decryptToken(cafe.botToken);
+}
+
+export function telegramAuth(options?: TelegramAuthOptions) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const initData = req.headers["x-telegram-init-data"];
+
+    // Если заголовок отсутствует
+    if (!initData || typeof initData !== "string") {
+      if (options?.required) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      return next();
+    }
+
+    const mainBotToken =
+      process.env.TELEGRAM_BOT_TOKEN_MAIN || process.env.TELEGRAM_BOT_TOKEN;
+
+    if (!mainBotToken) {
+      res.status(500).json({ error: "Main bot token not configured" });
       return;
     }
-  }
 
-  next();
+    const candidateTokens: string[] = [];
+
+    if (!options?.forceMainBot) {
+      const cafeToken = await resolveCafeBotToken(req);
+      if (cafeToken) candidateTokens.push(cafeToken);
+    }
+
+    candidateTokens.push(mainBotToken);
+
+    let parsedUser: any = null;
+    let isValid = false;
+
+    for (const token of candidateTokens) {
+      const data = validateTelegramInitData(initData, token);
+      if (!data) continue;
+
+      if (data.user) {
+        try {
+          parsedUser = JSON.parse(data.user);
+        } catch {
+          continue;
+        }
+      }
+
+      isValid = true;
+      break;
+    }
+
+    if (!isValid) {
+      res.status(401).json({ error: "Invalid Telegram initData" });
+      return;
+    }
+
+    if (parsedUser) {
+      req.telegramUser = parsedUser;
+    }
+
+    next();
+  };
 }

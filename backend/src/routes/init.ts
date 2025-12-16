@@ -4,22 +4,25 @@ import { telegramAuth } from "../middleware/telegramAuth";
 
 const router = Router();
 
-router.post("/", telegramAuth, async (req, res) => {
+router.post("/", telegramAuth(), async (req, res) => {
   const telegramUser = req.telegramUser;
   try {
-    const { cafeSlug } = req.body;
+    const { cafeSlug, startParam } = req.body;
 
-    if (!cafeSlug && !telegramUser) {
+    if (!cafeSlug && !startParam) {
       return res.status(400).json({ error: "No cafe identifier" });
     }
 
     // 1️⃣ Определяем кафе
-    const cafe = cafeSlug
-      ? await prisma.cafe.findUnique({
-          where: { slug: cafeSlug },
-          include: { settings: true },
-        })
-      : null;
+    const cafe = await prisma.cafe.findFirst({
+      where: {
+        OR: [
+          cafeSlug ? { slug: cafeSlug } : undefined,
+          startParam ? { startParam } : undefined,
+        ].filter(Boolean) as any,
+      },
+      include: { settings: true },
+    });
 
     if (!cafe) {
       return res.status(404).json({ error: "Cafe not found" });

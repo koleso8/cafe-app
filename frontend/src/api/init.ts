@@ -57,9 +57,10 @@ export interface InitResponse {
   role: "OWNER" | "MANAGER" | "STAFF" | "CLIENT";
 }
 
-export async function initCafe(cafeSlug: string | null) {
-  const { data } = await api.post<InitResponse>("/api/init", {
+export async function initCafe(cafeSlug: string | null, startParam?: string | null) {
+  const { data } = await api.post<InitResponse>("/init", {
     cafeSlug,
+    startParam,
   });
 
   return data;

@@ -11,23 +11,24 @@ export function CafeProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const load = async () => {
-            const params = new URLSearchParams(window.location.search);
-            const cafeSlug = params.get("cafe");
+        const params = new URLSearchParams(window.location.search);
+        const cafeSlug = params.get("cafe");
+        const startParam = params.get("start_param");
 
-            if (!cafeSlug) {
-                setError("Кафе не найдено");
-                setStatus("error");
-                return;
-            }
+        if (!cafeSlug && !startParam) {
+            setError("Кафе не найдено");
+            setStatus("error");
+            return;
+        }
 
-            try {
-                const result = await initCafe(cafeSlug);
-                setData(result);
-                setStatus("ready");
-            } catch {
-                setError("Ошибка загрузки кафе");
-                setStatus("error");
-            }
+        try {
+            const result = await initCafe(cafeSlug, startParam);
+            setData(result);
+            setStatus("ready");
+        } catch {
+            setError("Ошибка загрузки кафе");
+            setStatus("error");
+        }
         };
 
         load();
