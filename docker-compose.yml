@@ -1,7 +1,6 @@
 version: "3.9"
 
 services:
-  # PostgreSQL база данных
   db:
     image: postgres:16
     container_name: cafe-postgres
@@ -20,7 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend (Node.js)
   backend:
     build:
       context: ./backend
@@ -39,9 +37,27 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-    command: npm run dev
+    command: sh -lc "npm ci && npm run dev"
 
-  # Frontend (Vite + React)
+  # Отдельный сервис для Prisma Studio
+  prisma-studio:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cafe-prisma-studio
+    restart: always
+    ports:
+      - "5555:5555"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-cafe_dev}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -lc "npm ci && npx prisma studio --port 5555 --browser none"
+
   frontend:
     build:
       context: ./frontend
@@ -57,7 +73,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: npm run dev
+    command: sh -lc "npm ci && npm run dev -- --host"
 
 volumes:
   pgdata:
