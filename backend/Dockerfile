@@ -4,7 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+# Install devDependencies too so tools like ts-node are available for `npm run dev`.
+RUN npm ci
 
 COPY prisma ./prisma
 COPY tsconfig.json ./

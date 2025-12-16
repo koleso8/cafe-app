@@ -1,9 +1,11 @@
 {
-"compilerOptions": {
+  "compilerOptions": {
     "target": "ES2021",
     "module": "CommonJS",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
-}
+    "skipLibCheck": true,
+    "typeRoots": ["./src/types", "./node_modules/@types"]
+  },
+  "include": ["src/**/*"]
 }
