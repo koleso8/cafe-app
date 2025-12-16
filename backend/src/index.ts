@@ -1,6 +1,8 @@
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
+import "dotenv/config";
+
 
 import dotenv from "dotenv";
 dotenv.config();
